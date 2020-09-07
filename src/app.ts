@@ -4,7 +4,8 @@ import * as errorhandler from 'strong-error-handler';
 import { healthCheck } from './routes/healthCheck';
 import * as helmet from 'helmet';
 import * as jwt from 'jsonwebtoken';
-import { ACCESS_TOKEN_SECRET } from './utils/environmentVariables';
+import { ACCESS_TOKEN_SECRET, TARGET_DOMAIN } from './utils/environmentVariables';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 export const app = express();
 
@@ -26,21 +27,26 @@ app.use(helmet());
 
 app.use(authenticateToken);
 
+app.use(
+  createProxyMiddleware('/api', {
+    target: TARGET_DOMAIN,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/': '/', // rewrite path
+    },
+    onProxyReq: (proxyReq, req) => {
+      // Change authorization header for downstream request
+      // proxyReq.removeHeader('Authorization');
+      proxyReq.setHeader('Authorization', 'Something else');
+    },
+  }),
+);
+
 // middleware for parsing application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // middleware for json body parsing
 app.use(bodyParser.json({ limit: '5mb' }));
-
-// enable corse for all origins
-// app.use((req, res, next) => {
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header('Access-Control-Expose-Headers', 'x-total-count');
-//   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH');
-//   res.header('Access-Control-Allow-Headers', 'Content-Type,authorization');
-
-//   next();
-// });
 
 app.use('/healthCheck', healthCheck);
 
